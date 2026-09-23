@@ -1,4 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server";
 
 import { auth } from "@/auth";
 
@@ -28,6 +31,7 @@ interface UserUpdate {
   jobTitle?: unknown;
   phone?: unknown;
   notes?: unknown;
+  accessJustification?: unknown;
 }
 
 const allowedRoles = [
@@ -75,7 +79,9 @@ function isUserStatus(
 export async function GET(
   request: NextRequest,
   context: {
-    params: Promise<{ id: string }>;
+    params: Promise<{
+      id: string;
+    }>;
   }
 ) {
   try {
@@ -87,38 +93,48 @@ export async function GET(
           success: false,
           message: "Unauthorized.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
-    const { id } = await context.params;
+    const { id } =
+      await context.params;
 
-    const userId = Number(id);
+    const userId =
+      Number(id);
 
-    if (!Number.isInteger(userId)) {
+    if (
+      !Number.isInteger(userId)
+    ) {
       return NextResponse.json(
         {
           success: false,
-          message: "Invalid user ID.",
+          message:
+            "Invalid user ID.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    /*
-     * Read the latest user from
-     * data/users.json.
-     */
     const user =
-      await getUserById(userId);
+      await getUserById(
+        userId
+      );
 
     if (!user) {
       return NextResponse.json(
         {
           success: false,
-          message: "User not found.",
+          message:
+            "User not found.",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
     }
 
@@ -135,9 +151,12 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        message: "Failed to load user.",
+        message:
+          "Failed to load user.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
@@ -148,7 +167,9 @@ export async function GET(
 export async function PUT(
   request: NextRequest,
   context: {
-    params: Promise<{ id: string }>;
+    params: Promise<{
+      id: string;
+    }>;
   }
 ) {
   try {
@@ -158,16 +179,15 @@ export async function PUT(
       return NextResponse.json(
         {
           success: false,
-          message: "Unauthorized.",
+          message:
+            "Unauthorized.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
-    /*
-     * Administrator and Manager
-     * can update users.
-     */
     if (
       !canManageUsers(
         session.user.role
@@ -179,45 +199,56 @@ export async function PUT(
           message:
             "Forbidden. You do not have permission to update users.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       );
     }
 
-    const { id } = await context.params;
+    const { id } =
+      await context.params;
 
-    const userId = Number(id);
+    const userId =
+      Number(id);
 
-    if (!Number.isInteger(userId)) {
+    if (
+      !Number.isInteger(userId)
+    ) {
       return NextResponse.json(
         {
           success: false,
-          message: "Invalid user ID.",
+          message:
+            "Invalid user ID.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    /*
-     * Load the existing user from
-     * data/users.json.
-     */
     const previousUser =
-      await getUserById(userId);
+      await getUserById(
+        userId
+      );
 
     if (!previousUser) {
       return NextResponse.json(
         {
           success: false,
-          message: "User not found.",
+          message:
+            "User not found.",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
     }
 
     let body: UserUpdate;
 
     try {
-      body = await request.json();
+      body =
+        await request.json();
     } catch {
       return NextResponse.json(
         {
@@ -225,75 +256,141 @@ export async function PUT(
           message:
             "Invalid JSON request body. Please send valid JSON.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
     const name =
-      typeof body.name === "string"
+      typeof body.name ===
+      "string"
         ? body.name.trim()
         : "";
 
     const email =
-      typeof body.email === "string"
+      typeof body.email ===
+      "string"
         ? body.email
             .trim()
             .toLowerCase()
         : "";
 
     const role =
-      typeof body.role === "string"
+      typeof body.role ===
+      "string"
         ? body.role.trim()
         : "";
 
-    const status: UserStatus | "" =
-      isUserStatus(body.status)
+    const status:
+      | UserStatus
+      | "" =
+      isUserStatus(
+        body.status
+      )
         ? body.status
         : "";
 
     const department =
-      typeof body.department === "string"
+      typeof body.department ===
+      "string"
         ? body.department.trim()
         : "";
 
     const jobTitle =
-      typeof body.jobTitle === "string"
+      typeof body.jobTitle ===
+      "string"
         ? body.jobTitle.trim()
         : "";
 
     const phone =
-      typeof body.phone === "string"
+      typeof body.phone ===
+      "string"
         ? body.phone.trim()
         : "";
 
     const notes =
-      typeof body.notes === "string"
+      typeof body.notes ===
+      "string"
         ? body.notes.trim()
         : "";
 
+    const accessJustification =
+      typeof body.accessJustification ===
+      "string"
+        ? body.accessJustification.trim()
+        : previousUser
+            .accessJustification;
+
     /*
-     * Validate name.
+     * VALIDATION
      */
     if (!name) {
       return NextResponse.json(
         {
           success: false,
-          message: "Name is required.",
+          message:
+            "Name is required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    /*
-     * Validate email.
-     */
+    if (name.length < 2) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Name must contain at least 2 characters.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (name.length > 100) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Name must not exceed 100 characters.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      !/^[\p{L}\p{M}.' -]+$/u.test(
+        name
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Name can only contain letters, spaces, apostrophes, periods, and hyphens.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
     if (!email) {
       return NextResponse.json(
         {
           success: false,
-          message: "Email is required.",
+          message:
+            "Email is required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -308,39 +405,40 @@ export async function PUT(
           message:
             "Please enter a valid email address.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    /*
-     * Validate role.
-     */
     if (!isUserRole(role)) {
       return NextResponse.json(
         {
           success: false,
-          message: "Invalid role.",
+          message:
+            "Invalid role.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    /*
-     * Validate status.
-     */
-    if (!isUserStatus(status)) {
+    if (
+      !isUserStatus(status)
+    ) {
       return NextResponse.json(
         {
           success: false,
-          message: "Invalid status.",
+          message:
+            "Invalid status.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    /*
-     * Validate department.
-     */
     if (!department) {
       return NextResponse.json(
         {
@@ -348,13 +446,12 @@ export async function PUT(
           message:
             "Department is required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    /*
-     * Validate job title.
-     */
     if (!jobTitle) {
       return NextResponse.json(
         {
@@ -362,13 +459,30 @@ export async function PUT(
           message:
             "Job title is required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      role === "Administrator" &&
+      !accessJustification
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Access justification is required for Administrator accounts.",
+        },
+        {
+          status: 400,
+        }
       );
     }
 
     /*
-     * Read all users so we can
-     * check duplicate emails.
+     * DUPLICATE EMAIL CHECK
      */
     const allUsers =
       await getUsers();
@@ -377,7 +491,9 @@ export async function PUT(
       allUsers.find(
         (item) =>
           item.id !== userId &&
-          item.email.toLowerCase() ===
+          item.email
+            .trim()
+            .toLowerCase() ===
             email
       );
 
@@ -388,38 +504,40 @@ export async function PUT(
           message:
             "A user with this email already exists.",
         },
-        { status: 409 }
+        {
+          status: 409,
+        }
       );
     }
 
     /*
-     * Check whether profile
-     * information changed.
-     *
-     * Status is handled separately
-     * so we can create a specific
-     * status-change activity.
+     * DETECT CHANGES
      */
     const profileChanged =
-      previousUser.name !== name ||
-      previousUser.email !== email ||
-      previousUser.role !== role ||
+      previousUser.name !==
+        name ||
+      previousUser.email !==
+        email ||
+      previousUser.role !==
+        role ||
       previousUser.department !==
         department ||
       previousUser.jobTitle !==
         jobTitle ||
-      previousUser.phone !== phone ||
-      previousUser.notes !== notes;
+      previousUser.phone !==
+        phone ||
+      previousUser.notes !==
+        notes ||
+      previousUser
+        .accessJustification !==
+        accessJustification;
 
-    /*
-     * Check whether status changed.
-     */
     const statusChanged =
-      previousUser.status !== status;
+      previousUser.status !==
+      status;
 
     /*
-     * Save the changes into
-     * data/users.json.
+     * UPDATE POSTGRESQL
      */
     const updatedUser =
       await updateUser(
@@ -433,6 +551,7 @@ export async function PUT(
           jobTitle,
           phone,
           notes,
+          accessJustification,
         }
       );
 
@@ -440,27 +559,34 @@ export async function PUT(
       return NextResponse.json(
         {
           success: false,
-          message: "User not found.",
+          message:
+            "User not found.",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
     }
 
     /*
-     * Record profile activity only
-     * when profile information
-     * actually changed.
+     * SAVE PROFILE ACTIVITY.
+     *
+     * IMPORTANT:
+     * await ensures Vercel does
+     * not finish the request before
+     * PostgreSQL saves the activity.
      */
     if (profileChanged) {
-      recordUserUpdated(userId);
+      await recordUserUpdated(
+        userId
+      );
     }
 
     /*
-     * Record status activity only
-     * when Active/Inactive changed.
+     * SAVE STATUS ACTIVITY
      */
     if (statusChanged) {
-      recordUserStatusChanged(
+      await recordUserStatusChanged(
         userId,
         previousUser.status,
         status
@@ -479,13 +605,33 @@ export async function PUT(
       error
     );
 
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "P2002"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "A user with this email already exists.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,
         message:
           "Failed to update user.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
@@ -496,7 +642,9 @@ export async function PUT(
 export async function DELETE(
   request: NextRequest,
   context: {
-    params: Promise<{ id: string }>;
+    params: Promise<{
+      id: string;
+    }>;
   }
 ) {
   try {
@@ -506,16 +654,15 @@ export async function DELETE(
       return NextResponse.json(
         {
           success: false,
-          message: "Unauthorized.",
+          message:
+            "Unauthorized.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
-    /*
-     * Only Administrator can
-     * delete users.
-     */
     if (
       !canDeleteUsers(
         session.user.role
@@ -527,31 +674,37 @@ export async function DELETE(
           message:
             "Forbidden. Only administrators can delete users.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       );
     }
 
-    const { id } = await context.params;
+    const { id } =
+      await context.params;
 
-    const userId = Number(id);
+    const userId =
+      Number(id);
 
-    if (!Number.isInteger(userId)) {
+    if (
+      !Number.isInteger(userId)
+    ) {
       return NextResponse.json(
         {
           success: false,
           message:
             "Invalid user ID.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    /*
-     * Get the user before deleting
-     * so we can return it.
-     */
     const existingUser =
-      await getUserById(userId);
+      await getUserById(
+        userId
+      );
 
     if (!existingUser) {
       return NextResponse.json(
@@ -560,15 +713,16 @@ export async function DELETE(
           message:
             "User not found.",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
     }
 
-    /*
-     * Delete from data/users.json.
-     */
     const deleted =
-      await deleteUser(userId);
+      await deleteUser(
+        userId
+      );
 
     if (!deleted) {
       return NextResponse.json(
@@ -577,7 +731,9 @@ export async function DELETE(
           message:
             "User not found.",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
     }
 
@@ -599,7 +755,9 @@ export async function DELETE(
         message:
           "Failed to delete user.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }

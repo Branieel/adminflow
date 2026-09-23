@@ -68,7 +68,7 @@ function LoginForm() {
             </div>
 
             <h1 className="mt-5 text-2xl font-bold text-gray-900">
-              AdminFlow
+              TECHNICAL ASSESSMENT
             </h1>
 
             <p className="mt-2 text-sm text-gray-500">

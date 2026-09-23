@@ -1,5 +1,5 @@
-import fs from "fs";
-import path from "path";
+import { PrismaClient } from "@/generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 export type ActivityType =
   | "created"
@@ -23,48 +23,128 @@ interface CreateActivityInput {
 }
 
 /*
- * Location of the activity JSON file.
+ * Reuse the Prisma client during
+ * development to avoid creating
+ * multiple database connections.
  */
-const activitiesFilePath = path.join(
-  process.cwd(),
-  "data",
-  "user-activities.json"
-);
+const globalForPrisma =
+  globalThis as unknown as {
+    activityPrisma:
+      | PrismaClient
+      | undefined;
+  };
+
+const adapter = new PrismaPg({
+  connectionString:
+    process.env.DATABASE_URL!,
+});
+
+const prisma =
+  globalForPrisma.activityPrisma ??
+  new PrismaClient({
+    adapter,
+  });
+
+if (
+  process.env.NODE_ENV !==
+  "production"
+) {
+  globalForPrisma.activityPrisma =
+    prisma;
+}
 
 /*
- * Read all activities from
- * data/user-activities.json.
+ * Convert the database action
+ * into the ActivityType used
+ * by the UI.
  */
-export function getActivities(): UserActivity[] {
-  try {
-    if (!fs.existsSync(activitiesFilePath)) {
-      fs.writeFileSync(
-        activitiesFilePath,
-        JSON.stringify([], null, 2),
-        "utf-8"
-      );
+function getActivityType(
+  action: string
+): ActivityType {
+  if (action === "created") {
+    return "created";
+  }
 
-      return [];
-    }
+  if (action === "status") {
+    return "status";
+  }
 
-    const fileContent = fs.readFileSync(
-      activitiesFilePath,
-      "utf-8"
+  return "updated";
+}
+
+/*
+ * Build the title displayed in
+ * Activity & History.
+ */
+function getActivityTitle(
+  type: ActivityType
+): string {
+  if (type === "created") {
+    return "User account created";
+  }
+
+  if (type === "status") {
+    return "Account status changed";
+  }
+
+  return "Profile updated";
+}
+
+/*
+ * Convert a Prisma UserActivity
+ * record into the format expected
+ * by the existing UI.
+ */
+function toUserActivity(activity: {
+  id: number;
+  userId: number;
+  action: string;
+  details: string;
+  createdAt: Date;
+}): UserActivity {
+  const type =
+    getActivityType(
+      activity.action
     );
 
-    if (!fileContent.trim()) {
-      return [];
-    }
+  return {
+    id: activity.id,
+    userId: activity.userId,
 
-    const activities = JSON.parse(
-      fileContent
-    ) as UserActivity[];
+    title:
+      getActivityTitle(type),
 
-    if (!Array.isArray(activities)) {
-      return [];
-    }
+    description:
+      activity.details,
 
-    return activities;
+    createdAt:
+      activity.createdAt.toISOString(),
+
+    type,
+  };
+}
+
+/*
+ * Get all activities.
+ *
+ * PostgreSQL is now the permanent
+ * source instead of
+ * data/user-activities.json.
+ */
+export async function getActivities(): Promise<
+  UserActivity[]
+> {
+  try {
+    const activities =
+      await prisma.userActivity.findMany({
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+    return activities.map(
+      toUserActivity
+    );
   } catch (error) {
     console.error(
       "Failed to read user activities:",
@@ -76,145 +156,122 @@ export function getActivities(): UserActivity[] {
 }
 
 /*
- * Save all activities to
- * data/user-activities.json.
+ * Create an activity directly
+ * in PostgreSQL.
  */
-function saveActivities(
-  activities: UserActivity[]
-) {
-  fs.writeFileSync(
-    activitiesFilePath,
-    JSON.stringify(
-      activities,
-      null,
-      2
-    ),
-    "utf-8"
-  );
-}
-
-/*
- * Generate the next activity ID.
- */
-function getNextActivityId(
-  activities: UserActivity[]
-) {
-  if (activities.length === 0) {
-    return 1;
-  }
-
-  return (
-    Math.max(
-      ...activities.map(
-        (activity) => activity.id
-      )
-    ) + 1
-  );
-}
-
-/*
- * Create and permanently save
- * an activity record.
- */
-export function createUserActivity(
+export async function createUserActivity(
   input: CreateActivityInput
-) {
-  const activities =
-    getActivities();
+): Promise<UserActivity> {
+  const activity =
+    await prisma.userActivity.create({
+      data: {
+        userId: input.userId,
+        action: input.type,
+        details:
+          input.description,
+      },
+    });
 
-  const activity: UserActivity = {
-    id: getNextActivityId(
-      activities
-    ),
-    userId: input.userId,
+  return {
+    id: activity.id,
+    userId: activity.userId,
     title: input.title,
     description:
-      input.description,
-    type: input.type,
+      activity.details,
     createdAt:
-      new Date().toISOString(),
+      activity.createdAt.toISOString(),
+    type: input.type,
   };
-
-  activities.push(activity);
-
-  saveActivities(activities);
-
-  return activity;
 }
 
 /*
- * Get all activities belonging
- * to one user.
+ * Get activity history for
+ * one specific user.
  *
- * Newest activity appears first.
+ * Newest activity first.
  */
-export function getUserActivities(
+export async function getUserActivities(
   userId: number
-) {
-  const activities =
-    getActivities();
+): Promise<UserActivity[]> {
+  try {
+    const activities =
+      await prisma.userActivity.findMany({
+        where: {
+          userId,
+        },
 
-  return activities
-    .filter(
-      (activity) =>
-        activity.userId === userId
-    )
-    .sort(
-      (a, b) =>
-        new Date(
-          b.createdAt
-        ).getTime() -
-        new Date(
-          a.createdAt
-        ).getTime()
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+    return activities.map(
+      toUserActivity
     );
+  } catch (error) {
+    console.error(
+      `Failed to read activities for user ${userId}:`,
+      error
+    );
+
+    return [];
+  }
 }
 
 /*
- * Record creation of a user.
+ * Record account creation.
  */
-export function recordUserCreated(
+export async function recordUserCreated(
   userId: number,
   userName: string
-) {
+): Promise<UserActivity> {
   return createUserActivity({
     userId,
     title:
       "User account created",
-    description: `${userName}'s user account was created.`,
+
+    description:
+      `${userName}'s user account was created.`,
+
     type: "created",
   });
 }
 
 /*
- * Record a profile update.
+ * Record profile update.
  */
-export function recordUserUpdated(
+export async function recordUserUpdated(
   userId: number
-) {
+): Promise<UserActivity> {
   return createUserActivity({
     userId,
-    title: "Profile updated",
+    title:
+      "Profile updated",
+
     description:
       "User account information was updated.",
+
     type: "updated",
   });
 }
 
 /*
- * Record an account status change.
+ * Record account status change.
  */
-export function recordUserStatusChanged(
+export async function recordUserStatusChanged(
   userId: number,
   previousStatus: string,
   newStatus: string
-) {
+): Promise<UserActivity> {
   return createUserActivity({
     userId,
+
     title:
       "Account status changed",
+
     description:
       `Account status changed from ${previousStatus} to ${newStatus}.`,
+
     type: "status",
   });
 }

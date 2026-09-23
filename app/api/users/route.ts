@@ -59,14 +59,6 @@ function isUserStatus(
 
 /*
  * GET USERS
- *
- * Supports:
- * - Authentication
- * - Server-side pagination
- * - Search
- * - Status filtering
- * - Role filtering
- * - Sorting
  */
 export async function GET(
   request: NextRequest
@@ -86,11 +78,8 @@ export async function GET(
       );
     }
 
-    /*
-     * PostgreSQL/Prisma is asynchronous,
-     * so we must wait for the users.
-     */
-    const users = await getUsers();
+    const users =
+      await getUsers();
 
     const { searchParams } =
       new URL(request.url);
@@ -143,9 +132,6 @@ export async function GET(
         ? "desc"
         : "asc";
 
-    /*
-     * Search and filtering.
-     */
     const filteredUsers =
       users.filter((user) => {
         const matchesSearch =
@@ -181,9 +167,6 @@ export async function GET(
         );
       });
 
-    /*
-     * Only allow known sorting fields.
-     */
     const allowedSortFields = [
       "name",
       "email",
@@ -224,9 +207,6 @@ export async function GET(
         : -result;
     });
 
-    /*
-     * Server-side pagination.
-     */
     const total =
       sortedUsers.length;
 
@@ -293,9 +273,6 @@ export async function POST(
   try {
     const session = await auth();
 
-    /*
-     * Authentication check.
-     */
     if (!session?.user) {
       return NextResponse.json(
         {
@@ -308,9 +285,6 @@ export async function POST(
       );
     }
 
-    /*
-     * Role-based API access.
-     */
     if (
       !canManageUsers(
         session.user.role
@@ -349,9 +323,6 @@ export async function POST(
       );
     }
 
-    /*
-     * Normalize incoming data.
-     */
     const name =
       typeof body.name ===
       "string"
@@ -412,7 +383,7 @@ export async function POST(
         : "";
 
     /*
-     * SERVER-SIDE VALIDATION
+     * VALIDATION
      */
     if (!name) {
       return NextResponse.json(
@@ -433,6 +404,36 @@ export async function POST(
           success: false,
           message:
             "Name must contain at least 2 characters.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (name.length > 100) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Name must not exceed 100 characters.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      !/^[\p{L}\p{M}.' -]+$/u.test(
+        name
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Name can only contain letters, spaces, apostrophes, periods, and hyphens.",
         },
         {
           status: 400,
@@ -524,10 +525,6 @@ export async function POST(
       );
     }
 
-    /*
-     * Administrator accounts require
-     * an access justification.
-     */
     if (
       role === "Administrator" &&
       !accessJustification
@@ -545,10 +542,7 @@ export async function POST(
     }
 
     /*
-     * Duplicate email protection.
-     *
-     * getUsers() now reads from
-     * PostgreSQL through Prisma.
+     * DUPLICATE EMAIL CHECK
      */
     const users =
       await getUsers();
@@ -557,6 +551,7 @@ export async function POST(
       users.find(
         (user) =>
           user.email
+            .trim()
             .toLowerCase() ===
           email
       );
@@ -575,8 +570,7 @@ export async function POST(
     }
 
     /*
-     * Create and persist user
-     * in PostgreSQL.
+     * CREATE USER IN POSTGRESQL
      */
     const newUser =
       await createUser({
@@ -592,10 +586,13 @@ export async function POST(
       });
 
     /*
-     * Add creation event to
-     * Activity & History.
+     * IMPORTANT:
+     *
+     * Wait for PostgreSQL to save
+     * the creation activity before
+     * returning success.
      */
-    recordUserCreated(
+    await recordUserCreated(
       newUser.id,
       newUser.name
     );
@@ -616,6 +613,32 @@ export async function POST(
       "POST /api/users error:",
       error
     );
+
+    /*
+     * Prisma unique constraint
+     * fallback.
+     *
+     * Even if two requests arrive
+     * together, PostgreSQL still
+     * protects the unique email.
+     */
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "P2002"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "A user with this email already exists.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
 
     return NextResponse.json(
       {

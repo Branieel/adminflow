@@ -27,7 +27,7 @@ export default function Sidebar() {
           href="/dashboard"
           className="text-lg font-bold text-gray-900"
         >
-          AdminFlow
+          TECHNICAL ASSESSMENT
         </Link>
       </div>
 
@@ -56,7 +56,7 @@ export default function Sidebar() {
 
       <div className="border-t p-4">
         <p className="text-xs font-medium text-gray-700">
-          AdminFlow
+          TECHNICAL ASSESSMENT
         </p>
         <p className="mt-1 text-xs text-gray-400">
           Management Portal
