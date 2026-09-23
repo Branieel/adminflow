@@ -40,7 +40,9 @@ const STORAGE_KEY =
 
 function getInitialFormData(): FormData {
   if (typeof window === "undefined") {
-    return initialFormData;
+    return {
+      ...initialFormData,
+    };
   }
 
   try {
@@ -50,7 +52,9 @@ function getInitialFormData(): FormData {
       );
 
     if (!savedDraft) {
-      return initialFormData;
+      return {
+        ...initialFormData,
+      };
     }
 
     const parsedDraft =
@@ -61,11 +65,17 @@ function getInitialFormData(): FormData {
       ...parsedDraft,
     };
   } catch {
-    localStorage.removeItem(
-      STORAGE_KEY
-    );
+    try {
+      localStorage.removeItem(
+        STORAGE_KEY
+      );
+    } catch {
+      // Ignore localStorage errors.
+    }
 
-    return initialFormData;
+    return {
+      ...initialFormData,
+    };
   }
 }
 
@@ -126,6 +136,12 @@ export default function AdvancedUserForm({
 
   /*
    * AUTOSAVE DRAFT
+   *
+   * Save entered information while
+   * the user is completing the form.
+   *
+   * If the form becomes empty,
+   * remove the previous draft.
    */
   useEffect(() => {
     const timeout =
@@ -146,6 +162,10 @@ export default function AdvancedUserForm({
               JSON.stringify(
                 formData
               )
+            );
+          } else {
+            localStorage.removeItem(
+              STORAGE_KEY
             );
           }
         } catch {
@@ -291,8 +311,10 @@ export default function AdvancedUserForm({
   /*
    * CONTINUE / REVIEW
    *
-   * IMPORTANT:
-   * There is NO API request here.
+   * Step 1 -> Step 2
+   * Step 2 -> Step 3
+   *
+   * NO USER IS CREATED HERE.
    */
   const handleNext = () => {
     if (isSubmitting) {
@@ -316,8 +338,8 @@ export default function AdvancedUserForm({
   /*
    * BACK
    *
-   * Allows user to correct
-   * information before creating.
+   * Allows the information to be
+   * corrected before account creation.
    */
   const handleBack = () => {
     if (isSubmitting) {
@@ -337,7 +359,7 @@ export default function AdvancedUserForm({
   };
 
   /*
-   * ENTER KEY
+   * ENTER KEY PROTECTION
    *
    * Step 1:
    * Enter -> Continue
@@ -346,10 +368,10 @@ export default function AdvancedUserForm({
    * Enter -> Review
    *
    * Step 3:
-   * Enter -> NOTHING
+   * Enter -> Nothing
    *
    * This prevents accidental
-   * account creation.
+   * user creation.
    */
   const handleKeyDown = (
     event: KeyboardEvent<HTMLFormElement>
@@ -362,8 +384,8 @@ export default function AdvancedUserForm({
       event.target as HTMLElement;
 
     /*
-     * Allow normal new lines
-     * inside textarea.
+     * Keep normal Enter behavior
+     * inside textareas.
      */
     if (
       target.tagName ===
@@ -373,14 +395,14 @@ export default function AdvancedUserForm({
     }
 
     /*
-     * Prevent browser default
+     * Never allow browser default
      * form submission.
      */
     event.preventDefault();
 
     /*
-     * Only move forward on
-     * Step 1 and Step 2.
+     * Only continue on Steps
+     * 1 and 2.
      */
     if (step < 3) {
       handleNext();
@@ -390,15 +412,14 @@ export default function AdvancedUserForm({
   /*
    * CREATE USER
    *
-   * IMPORTANT:
-   *
-   * This is the ONLY place
-   * that POSTs to /api/users.
+   * This is the ONLY function
+   * that sends POST /api/users.
    */
   const handleCreateUser =
     async () => {
       /*
-       * Extra protection.
+       * User must be on the
+       * Review step.
        */
       if (step !== 3) {
         return;
@@ -412,7 +433,7 @@ export default function AdvancedUserForm({
       }
 
       /*
-       * Validate Step 1 again.
+       * Validate Account again.
        */
       if (!validateStep(1)) {
         setStep(1);
@@ -420,7 +441,7 @@ export default function AdvancedUserForm({
       }
 
       /*
-       * Validate Step 2 again.
+       * Validate Details again.
        */
       if (!validateStep(2)) {
         setStep(2);
@@ -481,27 +502,40 @@ export default function AdvancedUserForm({
           message?: string;
         };
 
+        /*
+         * Read API response.
+         */
         try {
           result =
             await response.json();
         } catch {
           throw new Error(
-            "The server returned an invalid response."
+            `The server returned an invalid response (${response.status}).`
           );
         }
 
+        /*
+         * Handle API/database error.
+         */
         if (
           !response.ok ||
           !result.success
         ) {
           throw new Error(
             result.message ||
-              "Failed to create user."
+              `Failed to create user (${response.status}).`
           );
         }
 
         /*
          * SUCCESS
+         *
+         * PostgreSQL has confirmed
+         * that the user was created.
+         */
+
+        /*
+         * Delete saved draft.
          */
         try {
           localStorage.removeItem(
@@ -511,6 +545,15 @@ export default function AdvancedUserForm({
           // Ignore localStorage errors.
         }
 
+        /*
+         * Completely reset form.
+         */
+        setFormData({
+          ...initialFormData,
+        });
+
+        setErrors({});
+        setErrorMessage("");
         setDraftRestored(false);
 
         setSuccessMessage(
@@ -518,14 +561,11 @@ export default function AdvancedUserForm({
         );
 
         /*
-         * Only clear after the
-         * database confirms success.
+         * Return form to Account
+         * before parent closes it.
          */
-        setFormData({
-          ...initialFormData,
-        });
-
         setTimeout(() => {
+          setStep(1);
           onSuccess();
         }, 700);
       } catch (error) {
@@ -541,11 +581,35 @@ export default function AdvancedUserForm({
 
   /*
    * CANCEL
+   *
+   * Cancel now means:
+   *
+   * - close Add User
+   * - discard the draft
+   * - clear all fields
    */
   const handleCancel = () => {
     if (isSubmitting) {
       return;
     }
+
+    try {
+      localStorage.removeItem(
+        STORAGE_KEY
+      );
+    } catch {
+      // Ignore localStorage errors.
+    }
+
+    setFormData({
+      ...initialFormData,
+    });
+
+    setErrors({});
+    setErrorMessage("");
+    setSuccessMessage("");
+    setDraftRestored(false);
+    setStep(1);
 
     onCancel();
   };
@@ -559,11 +623,11 @@ export default function AdvancedUserForm({
   return (
     <form
       /*
-       * NEVER allow the browser
-       * to submit this form.
+       * NEVER allow native form
+       * submission.
        *
-       * Account creation is handled
-       * only by handleCreateUser().
+       * Account creation only happens
+       * through handleCreateUser().
        */
       onSubmit={(event) => {
         event.preventDefault();
@@ -1200,6 +1264,7 @@ export default function AdvancedUserForm({
             <button
               /*
                * IMPORTANT:
+               * This is intentionally
                * NOT type="submit".
                */
               type="button"
