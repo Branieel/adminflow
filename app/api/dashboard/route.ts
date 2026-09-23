@@ -25,11 +25,10 @@ export async function GET(
     }
 
     /*
-     * Read the latest users from
-     * data/users.json.
+     * Read users from PostgreSQL
+     * through Prisma.
      */
-    const users =
-      await getUsers();
+    const users = await getUsers();
 
     const searchParams =
       request.nextUrl.searchParams;
@@ -49,14 +48,24 @@ export async function GET(
         ? Number(range)
         : 30;
 
-    const today =
-      new Date();
+    /*
+     * Calculate the starting date
+     * for the selected range.
+     */
+    const today = new Date();
 
     const startDate =
       new Date(today);
 
+    startDate.setHours(
+      0,
+      0,
+      0,
+      0
+    );
+
     startDate.setDate(
-      today.getDate() -
+      startDate.getDate() -
         selectedRange
     );
 
@@ -66,20 +75,31 @@ export async function GET(
      */
     const filteredUsers =
       users.filter((user) => {
+        if (!user.createdAt) {
+          return false;
+        }
+
         const createdAt =
           new Date(
             user.createdAt
           );
 
-        return (
-          !Number.isNaN(
+        if (
+          Number.isNaN(
             createdAt.getTime()
-          ) &&
-          createdAt >=
-            startDate
+          )
+        ) {
+          return false;
+        }
+
+        return (
+          createdAt >= startDate
         );
       });
 
+    /*
+     * KPI calculations.
+     */
     const totalUsers =
       filteredUsers.length;
 
@@ -118,16 +138,21 @@ export async function GET(
           "User"
       ).length;
 
+    /*
+     * Department analytics.
+     */
     const departmentCounts =
       filteredUsers.reduce<
         Record<string, number>
       >(
         (result, user) => {
-          result[
-            user.department
-          ] =
+          const department =
+            user.department ||
+            "Unassigned";
+
+          result[department] =
             (result[
-              user.department
+              department
             ] || 0) + 1;
 
           return result;
@@ -150,17 +175,21 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
+
       data: {
         range:
           String(
             selectedRange
           ),
+
         totalUsers,
         activeUsers,
         inactiveUsers,
+
         administrators,
         managers,
         regularUsers,
+
         departmentAnalytics,
       },
     });
