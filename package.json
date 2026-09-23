@@ -2,25 +2,25 @@
   "name": "adminflow",
   "version": "0.1.0",
   "private": true,
-"scripts": {
-  "dev": "next dev",
-  "build": "next build",
-  "start": "next start",
-  "lint": "eslint",
-  "test": "vitest run",
-  "test:watch": "vitest",
-  "postinstall": "prisma skills sync || exit 0"
-
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
-    "@prisma/client": "^7.10.0",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "7.10.0",
     "@tanstack/react-query": "^5.103.2",
     "clsx": "^2.1.1",
     "lucide-react": "^1.47.0",
     "next": "16.3.6",
     "next-auth": "^5.0.0-beta.32",
-    "prisma": "^8.0.0-rc.15",
+    "pg": "^8.23.0",
+    "prisma": "7.10.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-hook-form": "^7.88.0",

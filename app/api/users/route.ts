@@ -86,7 +86,11 @@ export async function GET(
       );
     }
 
-    const users = getUsers();
+    /*
+     * PostgreSQL/Prisma is asynchronous,
+     * so we must wait for the users.
+     */
+    const users = await getUsers();
 
     const { searchParams } =
       new URL(request.url);
@@ -98,9 +102,6 @@ export async function GET(
       ) || 1
     );
 
-    /*
-     * Limit maximum page size.
-     */
     const requestedPageSize =
       Number(
         searchParams.get(
@@ -404,12 +405,6 @@ export async function POST(
         ? body.notes.trim()
         : "";
 
-    /*
-     * Administrator access justification.
-     *
-     * This matches:
-     * formData.accessJustification
-     */
     const accessJustification =
       typeof body.accessJustification ===
       "string"
@@ -419,7 +414,6 @@ export async function POST(
     /*
      * SERVER-SIDE VALIDATION
      */
-
     if (!name) {
       return NextResponse.json(
         {
@@ -531,8 +525,6 @@ export async function POST(
     }
 
     /*
-     * Conditional server validation.
-     *
      * Administrator accounts require
      * an access justification.
      */
@@ -554,9 +546,12 @@ export async function POST(
 
     /*
      * Duplicate email protection.
+     *
+     * getUsers() now reads from
+     * PostgreSQL through Prisma.
      */
     const users =
-      getUsers();
+      await getUsers();
 
     const existingUser =
       users.find(
@@ -580,10 +575,11 @@ export async function POST(
     }
 
     /*
-     * Create and persist user.
+     * Create and persist user
+     * in PostgreSQL.
      */
     const newUser =
-      createUser({
+      await createUser({
         name,
         email,
         role,

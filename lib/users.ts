@@ -1,5 +1,23 @@
-import fs from "fs";
-import path from "path";
+import { PrismaClient } from "@/generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL!,
+});
+
+const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    adapter,
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+}
 
 export interface User {
   id: number;
@@ -15,175 +33,179 @@ export interface User {
   createdAt: string;
 }
 
-const usersFilePath = path.join(
-  process.cwd(),
-  "data",
-  "users.json"
-);
-
-function readUsers(): User[] {
-  try {
-    const fileContent = fs.readFileSync(
-      usersFilePath,
-      "utf-8"
-    );
-
-    const data = JSON.parse(fileContent);
-
-    if (!Array.isArray(data)) {
-      return [];
-    }
-
-    /*
-     * Keep compatibility with older users
-     * that were created before
-     * accessJustification was added.
-     */
-    return data.map((user) => ({
-      ...user,
-      accessJustification:
-        typeof user.accessJustification === "string"
-          ? user.accessJustification
-          : "",
-    })) as User[];
-  } catch (error) {
-    console.error(
-      "Failed to read users.json:",
-      error
-    );
-
-    return [];
-  }
-}
-
-function writeUsers(users: User[]) {
-  fs.writeFileSync(
-    usersFilePath,
-    JSON.stringify(users, null, 2),
-    "utf-8"
-  );
-}
-
-export function getUsers(): User[] {
-  return readUsers();
-}
-
-export function getUserById(
-  id: number
-): User | undefined {
-  const users = readUsers();
-
-  return users.find(
-    (user) => user.id === id
-  );
-}
-
-export function createUser(
-  userData: Omit<User, "id" | "createdAt">
-): User {
-  const users = readUsers();
-
-  const newId =
-    users.length > 0
-      ? Math.max(
-          ...users.map(
-            (user) => user.id
-          )
-        ) + 1
-      : 1;
-
-  const newUser: User = {
-    ...userData,
-    id: newId,
-    createdAt: new Date()
-      .toISOString()
-      .split("T")[0],
+function toUser(user: {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  department: string;
+  jobTitle: string;
+  phone: string;
+  notes: string;
+  accessJustification: string;
+  createdAt: Date;
+}): User {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    status:
+      user.status === "Inactive"
+        ? "Inactive"
+        : "Active",
+    department: user.department,
+    jobTitle: user.jobTitle,
+    phone: user.phone,
+    notes: user.notes,
+    accessJustification:
+      user.accessJustification,
+    createdAt:
+      user.createdAt
+        .toISOString()
+        .split("T")[0],
   };
-
-  users.push(newUser);
-
-  writeUsers(users);
-
-  return newUser;
 }
 
-export function updateUser(
+export async function getUsers(): Promise<User[]> {
+  const users = await prisma.user.findMany({
+    orderBy: {
+      id: "asc",
+    },
+  });
+
+  return users.map(toUser);
+}
+
+export async function getUserById(
+  id: number
+): Promise<User | undefined> {
+  const user = await prisma.user.findUnique({
+    where: {
+      id,
+    },
+  });
+
+  return user ? toUser(user) : undefined;
+}
+
+export async function createUser(
+  userData: Omit<User, "id" | "createdAt">
+): Promise<User> {
+  const user = await prisma.user.create({
+    data: {
+      name: userData.name,
+      email: userData.email,
+      role: userData.role,
+      status: userData.status,
+      department: userData.department,
+      jobTitle: userData.jobTitle,
+      phone: userData.phone,
+      notes: userData.notes,
+      accessJustification:
+        userData.accessJustification,
+    },
+  });
+
+  return toUser(user);
+}
+
+export async function updateUser(
   id: number,
   userData: Partial<
     Omit<User, "id" | "createdAt">
   >
-): User | null {
-  const users = readUsers();
+): Promise<User | null> {
+  const existingUser =
+    await prisma.user.findUnique({
+      where: { id },
+    });
 
-  const userIndex =
-    users.findIndex(
-      (user) => user.id === id
-    );
-
-  if (userIndex === -1) {
+  if (!existingUser) {
     return null;
   }
 
-  users[userIndex] = {
-    ...users[userIndex],
-    ...userData,
-  };
+  const user =
+    await prisma.user.update({
+      where: { id },
+      data: {
+        ...(userData.name !== undefined && {
+          name: userData.name,
+        }),
+        ...(userData.email !== undefined && {
+          email: userData.email,
+        }),
+        ...(userData.role !== undefined && {
+          role: userData.role,
+        }),
+        ...(userData.status !== undefined && {
+          status: userData.status,
+        }),
+        ...(userData.department !== undefined && {
+          department: userData.department,
+        }),
+        ...(userData.jobTitle !== undefined && {
+          jobTitle: userData.jobTitle,
+        }),
+        ...(userData.phone !== undefined && {
+          phone: userData.phone,
+        }),
+        ...(userData.notes !== undefined && {
+          notes: userData.notes,
+        }),
+        ...(userData.accessJustification !==
+          undefined && {
+          accessJustification:
+            userData.accessJustification,
+        }),
+      },
+    });
 
-  writeUsers(users);
-
-  return users[userIndex];
+  return toUser(user);
 }
 
-export function deleteUser(
+export async function deleteUser(
   id: number
-): boolean {
-  const users = readUsers();
+): Promise<boolean> {
+  const existingUser =
+    await prisma.user.findUnique({
+      where: { id },
+    });
 
-  const userIndex =
-    users.findIndex(
-      (user) => user.id === id
-    );
-
-  if (userIndex === -1) {
+  if (!existingUser) {
     return false;
   }
 
-  users.splice(userIndex, 1);
-
-  writeUsers(users);
+  await prisma.user.delete({
+    where: { id },
+  });
 
   return true;
 }
 
-export function deleteUsers(
+export async function deleteUsers(
   ids: number[]
-): number[] {
-  const users = readUsers();
-
-  const validIds = [
+): Promise<number[]> {
+  const uniqueIds = [
     ...new Set(ids),
   ];
 
-  const deletedIds =
-    users
-      .filter((user) =>
-        validIds.includes(user.id)
-      )
-      .map((user) => user.id);
-
-  if (deletedIds.length === 0) {
+  if (uniqueIds.length === 0) {
     return [];
   }
 
-  const remainingUsers =
-    users.filter(
-      (user) =>
-        !deletedIds.includes(
-          user.id
-        )
-    );
+  const result =
+    await prisma.user.deleteMany({
+      where: {
+        id: {
+          in: uniqueIds,
+        },
+      },
+    });
 
-  writeUsers(remainingUsers);
-
-  return deletedIds;
+  return uniqueIds.slice(
+    0,
+    result.count
+  );
 }
