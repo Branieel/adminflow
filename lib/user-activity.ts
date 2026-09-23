@@ -23,53 +23,48 @@ interface CreateActivityInput {
 }
 
 /*
- * Location of the permanent
- * activity history JSON file.
+ * Location of the activity JSON file.
  */
-const activitiesFilePath =
-  path.join(
-    process.cwd(),
-    "data",
-    "user-activities.json"
-  );
+const activitiesFilePath = path.join(
+  process.cwd(),
+  "data",
+  "user-activities.json"
+);
 
 /*
- * Read all activity records.
+ * Read all activities from
+ * data/user-activities.json.
  */
-function readActivities(): UserActivity[] {
+export function getActivities(): UserActivity[] {
   try {
-    if (
-      !fs.existsSync(
-        activitiesFilePath
-      )
-    ) {
+    if (!fs.existsSync(activitiesFilePath)) {
       fs.writeFileSync(
         activitiesFilePath,
-        "[]",
+        JSON.stringify([], null, 2),
         "utf-8"
       );
 
       return [];
     }
 
-    const fileContent =
-      fs.readFileSync(
-        activitiesFilePath,
-        "utf-8"
-      );
+    const fileContent = fs.readFileSync(
+      activitiesFilePath,
+      "utf-8"
+    );
 
     if (!fileContent.trim()) {
       return [];
     }
 
-    const parsed =
-      JSON.parse(fileContent);
+    const activities = JSON.parse(
+      fileContent
+    ) as UserActivity[];
 
-    if (!Array.isArray(parsed)) {
+    if (!Array.isArray(activities)) {
       return [];
     }
 
-    return parsed as UserActivity[];
+    return activities;
   } catch (error) {
     console.error(
       "Failed to read user activities:",
@@ -81,9 +76,10 @@ function readActivities(): UserActivity[] {
 }
 
 /*
- * Save all activity records.
+ * Save all activities to
+ * data/user-activities.json.
  */
-function writeActivities(
+function saveActivities(
   activities: UserActivity[]
 ) {
   fs.writeFileSync(
@@ -118,13 +114,13 @@ function getNextActivityId(
 
 /*
  * Create and permanently save
- * a new activity record.
+ * an activity record.
  */
 export function createUserActivity(
   input: CreateActivityInput
 ) {
   const activities =
-    readActivities();
+    getActivities();
 
   const activity: UserActivity = {
     id: getNextActivityId(
@@ -141,7 +137,7 @@ export function createUserActivity(
 
   activities.push(activity);
 
-  writeActivities(activities);
+  saveActivities(activities);
 
   return activity;
 }
@@ -154,9 +150,9 @@ export function createUserActivity(
  */
 export function getUserActivities(
   userId: number
-): UserActivity[] {
+) {
   const activities =
-    readActivities();
+    getActivities();
 
   return activities
     .filter(
@@ -185,14 +181,13 @@ export function recordUserCreated(
     userId,
     title:
       "User account created",
-    description:
-      `${userName}'s user account was created.`,
+    description: `${userName}'s user account was created.`,
     type: "created",
   });
 }
 
 /*
- * Record profile update.
+ * Record a profile update.
  */
 export function recordUserUpdated(
   userId: number
@@ -207,7 +202,7 @@ export function recordUserUpdated(
 }
 
 /*
- * Record account status change.
+ * Record an account status change.
  */
 export function recordUserStatusChanged(
   userId: number,

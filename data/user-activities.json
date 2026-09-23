@@ -78,5 +78,117 @@
     "description": "User account information was updated.",
     "type": "updated",
     "createdAt": "2026-09-23T19:18:31.422Z"
+  },
+  {
+    "id": 11,
+    "userId": 4,
+    "title": "Account status changed",
+    "description": "Account status changed from Active to Inactive.",
+    "type": "status",
+    "createdAt": "2026-09-23T22:04:56.850Z"
+  },
+  {
+    "id": 12,
+    "userId": 7,
+    "title": "Account status changed",
+    "description": "Account status changed from Inactive to Active.",
+    "type": "status",
+    "createdAt": "2026-09-23T22:19:17.988Z"
+  },
+  {
+    "id": 13,
+    "userId": 9,
+    "title": "User account created",
+    "description": "Marian's user account was created.",
+    "type": "created",
+    "createdAt": "2026-09-23T22:20:20.176Z"
+  },
+  {
+    "id": 14,
+    "userId": 9,
+    "title": "Profile updated",
+    "description": "User account information was updated.",
+    "type": "updated",
+    "createdAt": "2026-09-23T22:22:04.231Z"
+  },
+  {
+    "id": 15,
+    "userId": 9,
+    "title": "Profile updated",
+    "description": "User account information was updated.",
+    "type": "updated",
+    "createdAt": "2026-09-23T22:22:32.257Z"
+  },
+  {
+    "id": 16,
+    "userId": 6,
+    "title": "Profile updated",
+    "description": "User account information was updated.",
+    "type": "updated",
+    "createdAt": "2026-09-23T22:26:17.950Z"
+  },
+  {
+    "id": 17,
+    "userId": 10,
+    "title": "User account created",
+    "description": "Kara David's user account was created.",
+    "type": "created",
+    "createdAt": "2026-09-23T22:26:51.506Z"
+  },
+  {
+    "id": 18,
+    "userId": 11,
+    "title": "User account created",
+    "description": "Tims's user account was created.",
+    "type": "created",
+    "createdAt": "2026-09-23T22:30:21.417Z"
+  },
+  {
+    "id": 19,
+    "userId": 12,
+    "title": "User account created",
+    "description": "Asd's user account was created.",
+    "type": "created",
+    "createdAt": "2026-09-23T22:33:25.435Z"
+  },
+  {
+    "id": 20,
+    "userId": 13,
+    "title": "User account created",
+    "description": "Natsumi's user account was created.",
+    "type": "created",
+    "createdAt": "2026-09-23T22:34:10.039Z"
+  },
+  {
+    "id": 21,
+    "userId": 14,
+    "title": "User account created",
+    "description": "queque's user account was created.",
+    "type": "created",
+    "createdAt": "2026-09-23T22:37:05.590Z"
+  },
+  {
+    "id": 22,
+    "userId": 14,
+    "title": "Account status changed",
+    "description": "Account status changed from Active to Inactive.",
+    "type": "status",
+    "createdAt": "2026-09-23T22:37:28.345Z"
+  },
+  {
+    "id": 23,
+    "userId": 14,
+    "title": "Account status changed",
+    "description": "Account status changed from Inactive to Active.",
+    "type": "status",
+    "createdAt": "2026-09-23T22:37:43.883Z"
+  },
+  {
+    "id": 24,
+    "userId": 14,
+    "title": "Account status changed",
+    "description": "Account status changed from Active to Inactive.",
+    "type": "status",
+    "createdAt": "2026-09-23T22:37:51.514Z"
   }
 ]

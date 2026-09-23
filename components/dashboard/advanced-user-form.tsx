@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+  type KeyboardEvent,
+} from "react";
 
 interface AdvancedUserFormProps {
   onCancel: () => void;
@@ -88,13 +92,6 @@ export default function AdvancedUserForm({
   const [step, setStep] =
     useState(1);
 
-  /*
-   * Restore the saved draft using
-   * lazy state initialization.
-   *
-   * This avoids calling setState
-   * synchronously inside useEffect.
-   */
   const [formData, setFormData] =
     useState<FormData>(
       getInitialFormData
@@ -128,35 +125,42 @@ export default function AdvancedUserForm({
   );
 
   /*
-   * Autosave form changes.
+   * AUTOSAVE DRAFT
    */
   useEffect(() => {
     const timeout =
       setTimeout(() => {
-        const hasData =
-          Object.values(
-            formData
-          ).some(
-            (value) =>
-              String(
-                value
-              ).trim() !== ""
-          );
+        try {
+          const hasData =
+            formData.name.trim() !== "" ||
+            formData.email.trim() !== "" ||
+            formData.department.trim() !== "" ||
+            formData.jobTitle.trim() !== "" ||
+            formData.phone.trim() !== "" ||
+            formData.notes.trim() !== "" ||
+            formData.accessJustification.trim() !== "";
 
-        if (hasData) {
-          localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify(
-              formData
-            )
-          );
+          if (hasData) {
+            localStorage.setItem(
+              STORAGE_KEY,
+              JSON.stringify(
+                formData
+              )
+            );
+          }
+        } catch {
+          // Ignore localStorage errors.
         }
       }, 300);
 
-    return () =>
+    return () => {
       clearTimeout(timeout);
+    };
   }, [formData]);
 
+  /*
+   * UPDATE FIELD
+   */
   const updateField = <
     K extends keyof FormData,
   >(
@@ -181,6 +185,9 @@ export default function AdvancedUserForm({
     setSuccessMessage("");
   };
 
+  /*
+   * VALIDATION
+   */
   const validateStep = (
     currentStep: number
   ) => {
@@ -189,22 +196,44 @@ export default function AdvancedUserForm({
       string
     > = {};
 
+    /*
+     * STEP 1
+     */
     if (currentStep === 1) {
-      if (
-        !formData.name.trim()
-      ) {
+      const cleanName =
+        formData.name.trim();
+
+      const cleanEmail =
+        formData.email.trim();
+
+      if (!cleanName) {
         newErrors.name =
           "Name is required.";
+      } else if (
+        cleanName.length < 2
+      ) {
+        newErrors.name =
+          "Name must contain at least 2 characters.";
+      } else if (
+        cleanName.length > 100
+      ) {
+        newErrors.name =
+          "Name must not exceed 100 characters.";
+      } else if (
+        !/^[\p{L}\p{M}.' -]+$/u.test(
+          cleanName
+        )
+      ) {
+        newErrors.name =
+          "Name can only contain letters, spaces, apostrophes, periods, and hyphens.";
       }
 
-      if (
-        !formData.email.trim()
-      ) {
+      if (!cleanEmail) {
         newErrors.email =
           "Email is required.";
       } else if (
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-          formData.email
+          cleanEmail
         )
       ) {
         newErrors.email =
@@ -222,6 +251,9 @@ export default function AdvancedUserForm({
       }
     }
 
+    /*
+     * STEP 2
+     */
     if (currentStep === 2) {
       if (
         !formData.department.trim()
@@ -256,18 +288,46 @@ export default function AdvancedUserForm({
     );
   };
 
+  /*
+   * CONTINUE / REVIEW
+   *
+   * IMPORTANT:
+   * There is NO API request here.
+   */
   const handleNext = () => {
-    if (validateStep(step)) {
-      setStep((current) =>
-        Math.min(
-          current + 1,
-          3
-        )
-      );
+    if (isSubmitting) {
+      return;
+    }
+
+    if (!validateStep(step)) {
+      return;
+    }
+
+    if (step === 1) {
+      setStep(2);
+      return;
+    }
+
+    if (step === 2) {
+      setStep(3);
     }
   };
 
+  /*
+   * BACK
+   *
+   * Allows user to correct
+   * information before creating.
+   */
   const handleBack = () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    setErrors({});
+    setErrorMessage("");
+    setSuccessMessage("");
+
     setStep((current) =>
       Math.max(
         current - 1,
@@ -276,84 +336,218 @@ export default function AdvancedUserForm({
     );
   };
 
-  const handleSubmit = async (
-    event: React.FormEvent
+  /*
+   * ENTER KEY
+   *
+   * Step 1:
+   * Enter -> Continue
+   *
+   * Step 2:
+   * Enter -> Review
+   *
+   * Step 3:
+   * Enter -> NOTHING
+   *
+   * This prevents accidental
+   * account creation.
+   */
+  const handleKeyDown = (
+    event: KeyboardEvent<HTMLFormElement>
   ) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    const target =
+      event.target as HTMLElement;
+
+    /*
+     * Allow normal new lines
+     * inside textarea.
+     */
+    if (
+      target.tagName ===
+      "TEXTAREA"
+    ) {
+      return;
+    }
+
+    /*
+     * Prevent browser default
+     * form submission.
+     */
     event.preventDefault();
 
-    if (!validateStep(1)) {
-      setStep(1);
-      return;
+    /*
+     * Only move forward on
+     * Step 1 and Step 2.
+     */
+    if (step < 3) {
+      handleNext();
     }
+  };
 
-    if (!validateStep(2)) {
-      setStep(2);
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      setErrorMessage("");
-      setSuccessMessage("");
-
-      const response =
-        await fetch(
-          "/api/users",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify(
-              formData
-            ),
-          }
-        );
-
-      const result =
-        await response.json();
-
-      if (
-        !response.ok ||
-        !result.success
-      ) {
-        throw new Error(
-          result.message ||
-            "Failed to create user."
-        );
+  /*
+   * CREATE USER
+   *
+   * IMPORTANT:
+   *
+   * This is the ONLY place
+   * that POSTs to /api/users.
+   */
+  const handleCreateUser =
+    async () => {
+      /*
+       * Extra protection.
+       */
+      if (step !== 3) {
+        return;
       }
 
-      localStorage.removeItem(
-        STORAGE_KEY
-      );
+      /*
+       * Prevent duplicate requests.
+       */
+      if (isSubmitting) {
+        return;
+      }
 
-      setSuccessMessage(
-        "User created successfully."
-      );
+      /*
+       * Validate Step 1 again.
+       */
+      if (!validateStep(1)) {
+        setStep(1);
+        return;
+      }
 
-      setFormData(
-        initialFormData
-      );
+      /*
+       * Validate Step 2 again.
+       */
+      if (!validateStep(2)) {
+        setStep(2);
+        return;
+      }
 
-      setDraftRestored(
-        false
-      );
+      try {
+        setIsSubmitting(true);
+        setErrorMessage("");
+        setSuccessMessage("");
 
-      setTimeout(() => {
-        onSuccess();
-      }, 700);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Failed to create user."
-      );
-    } finally {
-      setIsSubmitting(
-        false
-      );
+        const response =
+          await fetch(
+            "/api/users",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body: JSON.stringify({
+                name:
+                  formData.name.trim(),
+
+                email:
+                  formData.email
+                    .trim()
+                    .toLowerCase(),
+
+                role:
+                  formData.role,
+
+                status:
+                  formData.status,
+
+                department:
+                  formData.department.trim(),
+
+                jobTitle:
+                  formData.jobTitle.trim(),
+
+                phone:
+                  formData.phone.trim(),
+
+                notes:
+                  formData.notes.trim(),
+
+                accessJustification:
+                  formData.accessJustification.trim(),
+              }),
+            }
+          );
+
+        let result: {
+          success?: boolean;
+          message?: string;
+        };
+
+        try {
+          result =
+            await response.json();
+        } catch {
+          throw new Error(
+            "The server returned an invalid response."
+          );
+        }
+
+        if (
+          !response.ok ||
+          !result.success
+        ) {
+          throw new Error(
+            result.message ||
+              "Failed to create user."
+          );
+        }
+
+        /*
+         * SUCCESS
+         */
+        try {
+          localStorage.removeItem(
+            STORAGE_KEY
+          );
+        } catch {
+          // Ignore localStorage errors.
+        }
+
+        setDraftRestored(false);
+
+        setSuccessMessage(
+          "User created successfully."
+        );
+
+        /*
+         * Only clear after the
+         * database confirms success.
+         */
+        setFormData({
+          ...initialFormData,
+        });
+
+        setTimeout(() => {
+          onSuccess();
+        }, 700);
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Failed to create user."
+        );
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+  /*
+   * CANCEL
+   */
+  const handleCancel = () => {
+    if (isSubmitting) {
+      return;
     }
+
+    onCancel();
   };
 
   const inputClass =
@@ -364,11 +558,24 @@ export default function AdvancedUserForm({
 
   return (
     <form
-      onSubmit={
-        handleSubmit
+      /*
+       * NEVER allow the browser
+       * to submit this form.
+       *
+       * Account creation is handled
+       * only by handleCreateUser().
+       */
+      onSubmit={(event) => {
+        event.preventDefault();
+      }}
+      onKeyDown={
+        handleKeyDown
       }
+      noValidate
       className="rounded-xl border border-gray-200 bg-white shadow-sm"
     >
+      {/* HEADER */}
+
       <div className="border-b border-gray-200 px-5 py-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -388,6 +595,8 @@ export default function AdvancedUserForm({
             </span>
           )}
         </div>
+
+        {/* PROGRESS */}
 
         <div className="mt-5 grid grid-cols-3 gap-2">
           {[1, 2, 3].map(
@@ -437,6 +646,8 @@ export default function AdvancedUserForm({
         </div>
       </div>
 
+      {/* CONTENT */}
+
       <div className="p-5">
         {errorMessage && (
           <div
@@ -456,6 +667,8 @@ export default function AdvancedUserForm({
           </div>
         )}
 
+        {/* STEP 1 */}
+
         {step === 1 && (
           <div className="grid gap-5 md:grid-cols-2">
             <div>
@@ -468,6 +681,7 @@ export default function AdvancedUserForm({
 
               <input
                 id="user-name"
+                type="text"
                 value={
                   formData.name
                 }
@@ -476,11 +690,11 @@ export default function AdvancedUserForm({
                 ) =>
                   updateField(
                     "name",
-                    event.target
-                      .value
+                    event.target.value
                   )
                 }
                 placeholder="John Smith"
+                autoComplete="name"
                 className={
                   errors.name
                     ? errorInputClass
@@ -514,11 +728,11 @@ export default function AdvancedUserForm({
                 ) =>
                   updateField(
                     "email",
-                    event.target
-                      .value
+                    event.target.value
                   )
                 }
                 placeholder="john@example.com"
+                autoComplete="email"
                 className={
                   errors.email
                     ? errorInputClass
@@ -528,9 +742,7 @@ export default function AdvancedUserForm({
 
               {errors.email && (
                 <p className="mt-1 text-xs text-red-600">
-                  {
-                    errors.email
-                  }
+                  {errors.email}
                 </p>
               )}
             </div>
@@ -552,8 +764,7 @@ export default function AdvancedUserForm({
                   event
                 ) => {
                   const nextRole =
-                    event.target
-                      .value;
+                    event.target.value;
 
                   updateField(
                     "role",
@@ -637,14 +848,14 @@ export default function AdvancedUserForm({
 
               {errors.status && (
                 <p className="mt-1 text-xs text-red-600">
-                  {
-                    errors.status
-                  }
+                  {errors.status}
                 </p>
               )}
             </div>
           </div>
         )}
+
+        {/* STEP 2 */}
 
         {step === 2 && (
           <div className="grid gap-5 md:grid-cols-2">
@@ -658,6 +869,7 @@ export default function AdvancedUserForm({
 
               <input
                 id="user-department"
+                type="text"
                 value={
                   formData.department
                 }
@@ -666,8 +878,7 @@ export default function AdvancedUserForm({
                 ) =>
                   updateField(
                     "department",
-                    event.target
-                      .value
+                    event.target.value
                   )
                 }
                 placeholder="IT"
@@ -697,6 +908,7 @@ export default function AdvancedUserForm({
 
               <input
                 id="user-job-title"
+                type="text"
                 value={
                   formData.jobTitle
                 }
@@ -705,8 +917,7 @@ export default function AdvancedUserForm({
                 ) =>
                   updateField(
                     "jobTitle",
-                    event.target
-                      .value
+                    event.target.value
                   )
                 }
                 placeholder="IT Administrator"
@@ -745,11 +956,11 @@ export default function AdvancedUserForm({
                 ) =>
                   updateField(
                     "phone",
-                    event.target
-                      .value
+                    event.target.value
                   )
                 }
                 placeholder="+971 50 123 4567"
+                autoComplete="tel"
                 className={
                   inputClass
                 }
@@ -763,8 +974,7 @@ export default function AdvancedUserForm({
                   htmlFor="user-access-justification"
                   className="mb-2 block text-sm font-medium text-gray-700"
                 >
-                  Administrator
-                  Access
+                  Administrator Access
                   Justification{" "}
                   <span className="text-red-600">
                     *
@@ -782,9 +992,7 @@ export default function AdvancedUserForm({
                   ) =>
                     updateField(
                       "accessJustification",
-                      event
-                        .target
-                        .value
+                      event.target.value
                     )
                   }
                   placeholder="Explain why this user requires Administrator access..."
@@ -805,9 +1013,8 @@ export default function AdvancedUserForm({
 
                 <p className="mt-1 text-xs text-gray-500">
                   Required because
-                  Administrator
-                  accounts have
-                  elevated system
+                  Administrator accounts
+                  have elevated system
                   permissions.
                 </p>
               </div>
@@ -832,8 +1039,7 @@ export default function AdvancedUserForm({
                 ) =>
                   updateField(
                     "notes",
-                    event.target
-                      .value
+                    event.target.value
                   )
                 }
                 placeholder="Add any additional notes..."
@@ -845,6 +1051,8 @@ export default function AdvancedUserForm({
           </div>
         )}
 
+        {/* STEP 3 - REVIEW ONLY */}
+
         {step === 3 && (
           <div>
             <h3 className="text-base font-semibold text-gray-900">
@@ -853,8 +1061,10 @@ export default function AdvancedUserForm({
 
             <p className="mt-1 text-sm text-gray-500">
               Please review the
-              information before
-              creating the account.
+              information carefully.
+              Nothing will be saved
+              until you click Create
+              User.
             </p>
 
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -912,8 +1122,7 @@ export default function AdvancedUserForm({
                 "Administrator" && (
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 sm:col-span-2">
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Administrator
-                    Access
+                    Administrator Access
                     Justification
                   </p>
 
@@ -940,10 +1149,14 @@ export default function AdvancedUserForm({
         )}
       </div>
 
+      {/* ACTIONS */}
+
       <div className="flex flex-col-reverse gap-3 border-t border-gray-200 bg-gray-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <button
           type="button"
-          onClick={onCancel}
+          onClick={
+            handleCancel
+          }
           disabled={
             isSubmitting
           }
@@ -979,11 +1192,20 @@ export default function AdvancedUserForm({
               }
               className="rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Continue
+              {step === 1
+                ? "Continue"
+                : "Review"}
             </button>
           ) : (
             <button
-              type="submit"
+              /*
+               * IMPORTANT:
+               * NOT type="submit".
+               */
+              type="button"
+              onClick={
+                handleCreateUser
+              }
               disabled={
                 isSubmitting
               }
@@ -1013,7 +1235,7 @@ function ReviewItem({
         {label}
       </p>
 
-      <p className="mt-1 text-sm font-medium text-gray-900">
+      <p className="mt-1 break-words text-sm font-medium text-gray-900">
         {value}
       </p>
     </div>
