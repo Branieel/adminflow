@@ -1,0 +1,82 @@
+[
+  {
+    "id": 1,
+    "userId": 1,
+    "title": "Profile updated",
+    "description": "User account information was updated.",
+    "type": "updated",
+    "createdAt": "2026-09-23T18:33:46.096Z"
+  },
+  {
+    "id": 2,
+    "userId": 1,
+    "title": "Account status changed",
+    "description": "Account status changed from Inactive to Active.",
+    "type": "status",
+    "createdAt": "2026-09-23T18:33:46.098Z"
+  },
+  {
+    "id": 3,
+    "userId": 2,
+    "title": "User account created",
+    "description": "Braniel's user account was created.",
+    "type": "created",
+    "createdAt": "2026-09-23T18:37:26.651Z"
+  },
+  {
+    "id": 4,
+    "userId": 3,
+    "title": "User account created",
+    "description": "JOhn's user account was created.",
+    "type": "created",
+    "createdAt": "2026-09-23T18:50:12.378Z"
+  },
+  {
+    "id": 5,
+    "userId": 3,
+    "title": "Account status changed",
+    "description": "Account status changed from Active to Inactive.",
+    "type": "status",
+    "createdAt": "2026-09-23T18:50:20.454Z"
+  },
+  {
+    "id": 6,
+    "userId": 3,
+    "title": "Profile updated",
+    "description": "User account information was updated.",
+    "type": "updated",
+    "createdAt": "2026-09-23T18:50:25.040Z"
+  },
+  {
+    "id": 7,
+    "userId": 4,
+    "title": "User account created",
+    "description": "IT Test's user account was created.",
+    "type": "created",
+    "createdAt": "2026-09-23T19:05:01.103Z"
+  },
+  {
+    "id": 8,
+    "userId": 1,
+    "title": "Profile updated",
+    "description": "User account information was updated.",
+    "type": "updated",
+    "createdAt": "2026-09-23T19:05:23.458Z"
+  },
+  {
+    "id": 9,
+    "userId": 5,
+    "title": "User account created",
+    "description": "Steph's user account was created.",
+    "type": "created",
+    "createdAt": "2026-09-23T19:18:20.083Z"
+  },
+  {
+    "id": 10,
+    "userId": 5,
+    "title": "Profile updated",
+    "description": "User account information was updated.",
+    "type": "updated",
+    "createdAt": "2026-09-23T19:18:31.422Z"
+  }
+]
